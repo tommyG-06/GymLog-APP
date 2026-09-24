@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Gym Logbook Ultimate</title>
+
+  <!-- PWA: rende l'app installabile come app vera (standalone, senza barra Safari) -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Gym Log">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="icon" href="icon.png">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-main: #0b0e14;
+      --bg-card: #161b26;
+      --bg-card-subtle: #1f2637;
+      --accent-primary: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --accent-future: #f59e0b;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --border-color: rgba(255, 255, 255, 0.07);
+      --border-focus: rgba(56, 189, 248, 0.5);
+      --danger-color: #ef4444;
+      --today-color: #facc15;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --nav-height: 65px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      padding-top: env(safe-area-inset-top);
+      background-color: #0b0e14;
+    }
+
+    header {
+      flex-shrink: 0;
+      padding: 14px 16px;
+      background: #0b0e14;
+      border-bottom: 1px solid var(--border-color);
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.3px;
+      z-index: 10;
+    }
+
+    main {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior-y: none;
+      padding: 16px;
+      padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 30px);
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+    }
+
+    .tab-content {
+      display: none;
+      width: 100%;
+      will-change: transform, opacity;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .tab-content.slide-left {
+      animation: slideInLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .tab-content.slide-right {
+      animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes slideInLeft {
+      0% { opacity: 0; transform: translate3d(30px, 0, 0); }
+      100% { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+
+    @keyframes slideInRight {
+      0% { opacity: 0; transform: translate3d(-30px, 0, 0); }
+      100% { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: var(--bg-card-subtle);
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      font-weight: 500;
+      margin-bottom: 14px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .selected-date-box {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      background: var(--bg-card-subtle);
+      color: var(--accent-primary);
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 4px var(--accent-glow);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+      color: #ffffff;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      padding: 16px;
+      border-radius: var(--radius-md);
+      box-shadow: 0 6px 20px var(--accent-glow);
+      margin-bottom: 0;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card-subtle);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      font-weight: 600;
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--danger-color);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      font-weight: 600;
+      margin-bottom: 0;
+      cursor: pointer;
+    }
+
+    nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(var(--nav-height) + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(11, 14, 20, 0.92);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .nav-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 6px 8px;
+      margin: 0;
+      transition: color 0.25s ease, transform 0.2s ease;
+    }
+
+    .nav-btn.active {
+      color: var(--accent-primary);
+      transform: translateY(-1px);
+    }
+
+    .nav-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+      margin-bottom: 3px;
+      transition: fill 0.25s ease;
+    }
+
+    .exercise-block {
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+
+    .set-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    .set-row input {
+      margin-bottom: 0;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .sets-config-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+    }
+
+    .sets-config-row label {
+      margin: 0;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .sets-config-row input {
+      width: 60px;
+      margin: 0;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .set-line {
+      display: grid;
+      grid-template-columns: 28px 1fr 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    .set-line .set-number {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .set-line input {
+      margin-bottom: 0;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      text-align: center;
+    }
+
+    .day-name {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      padding: 4px 0;
+    }
+
+    .day-cell {
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-card-subtle);
+      border-radius: var(--radius-md);
+      font-size: 0.9rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s ease;
+    }
+
+    .day-cell.today {
+      border-color: var(--today-color);
+      box-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
+    }
+
+    .day-cell.today::before {
+      content: 'OGGI';
+      font-size: 0.48rem;
+      position: absolute;
+      top: 3px;
+      color: var(--today-color);
+      font-weight: 800;
+    }
+
+    .day-cell.selected {
+      border-color: var(--accent-primary);
+      background: rgba(56, 189, 248, 0.15);
+    }
+
+    .day-cell .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      position: absolute;
+      bottom: 5px;
+    }
+
+    .day-cell .dot.logged {
+      background: var(--accent-primary);
+      box-shadow: 0 0 8px var(--accent-primary);
+    }
+
+    .day-cell .dot.planned {
+      background: var(--accent-future);
+      box-shadow: 0 0 8px var(--accent-future);
+    }
+
+    .period-picker-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .period-group {
+      background: var(--bg-card-subtle);
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+    }
+
+    .period-selects {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .period-selects select {
+      margin-bottom: 0;
+      padding: 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .stats-container {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+
+    .stat-val {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--accent-primary);
+      margin-top: 2px;
+      letter-spacing: -0.5px;
+    }
+
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      margin-top: 14px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .timer-display {
+      font-size: 3.2rem;
+      font-weight: 800;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+      margin: 12px 0 18px 0;
+      letter-spacing: -1px;
+    }
+
+    .quick-timer-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .quick-timer-btn {
+      padding: 10px 0;
+      font-size: 0.82rem;
+      font-weight: 700;
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      margin-bottom: 0;
+    }
+
+    .quick-timer-btn:active {
+      background: var(--accent-glow);
+      border-color: var(--accent-primary);
+    }
+
+    .timer-controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    .timer-alert {
+      animation: pulseGlow 1s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { box-shadow: 0 0 10px rgba(239, 68, 68, 0.3); border-color: rgba(239, 68, 68, 0.4); }
+      to { box-shadow: 0 0 25px rgba(239, 68, 68, 0.8); border-color: var(--danger-color); }
+    }
+  </style>
+</head>
+<body>
+
+  <header id="header-title">Logbook Calendario</header>
+
+  <main id="main-container">
+    <!-- TAB 1: LOG CALENDARIO -->
+    <section id="tab-log" class="tab-content active">
+      <div class="card">
+        <div class="calendar-header">
+          <button style="width: auto; padding: 6px 16px; margin:0;" onclick="changeMonth(-1)">&lt;</button>
+          <span id="current-month-display" style="font-weight: 800; font-size: 1.05rem;"></span>
+          <button style="width: auto; padding: 6px 16px; margin:0;" onclick="changeMonth(1)">&gt;</button>
+        </div>
+        
+        <div class="calendar-grid">
+          <div class="day-name">L</div><div class="day-name">M</div><div class="day-name">M</div>
+          <div class="day-name">G</div><div class="day-name">V</div><div class="day-name">S</div><div class="day-name">D</div>
+        </div>
+        <div class="calendar-grid" id="calendar-body" style="margin-top: 6px;"></div>
+
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-dot" style="background: var(--accent-primary);"></div> Registrato
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: var(--accent-future);"></div> Programmato
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <label>Data Selezionata</label>
+        <div id="selected-date-display" class="selected-date-box"></div>
+
+        <label>Scegli Scheda Allenamento</label>
+        <select id="workout-select" onchange="loadWorkoutTemplate()">
+          <option value="">-- Seleziona o Programma --</option>
+        </select>
+
+        <div id="exercise-logs-container"></div>
+
+        <button class="btn-primary" onclick="saveDailyLog()">Salva Sessione / Programma</button>
+        <button class="btn-danger" style="margin-top: 10px;" onclick="deleteDailyLog()">Elimina Sessione Data</button>
+      </div>
+    </section>
+
+    <!-- TAB 2: ELENCO ALLENAMENTI -->
+    <section id="tab-workouts" class="tab-content">
+      <div class="card">
+        <div class="card-title">Backup Dati</div>
+        <p style="color:var(--text-secondary); font-size:0.85rem; font-weight:500; margin-bottom:12px;">Esporta un file con tutte le tue schede e sessioni registrate, da conservare o trasferire su un altro dispositivo.</p>
+        <button class="btn-primary" onclick="exportBackup()">Esporta Backup (.json)</button>
+        <button class="btn-secondary" style="margin-top:10px;" onclick="document.getElementById('import-file-input').click()">Importa Backup</button>
+        <input type="file" id="import-file-input" accept="application/json" style="display:none;" onchange="importBackup(event)">
+      </div>
+
+      <div class="card">
+        <div class="card-title" id="workout-form-title">Crea Nuova Scheda</div>
+        <label>Nome Allenamento</label>
+        <input type="text" id="new-workout-name" placeholder="es. PUSH DAY, PULL DAY, LEG DAY">
+
+        <label>Esercizi (separati da virgola)</label>
+        <input type="text" id="new-workout-exercises" placeholder="Panca Piana, Croci, Lento Avanti..." oninput="renderExerciseSetsConfig()">
+
+        <label style="margin-top:14px;">Numero di Serie per Esercizio</label>
+        <div id="exercise-sets-config"></div>
+
+        <button class="btn-primary" id="save-workout-btn" onclick="addWorkoutScheme()">Salva Scheda in Lista</button>
+        <button class="btn-secondary" id="cancel-edit-btn" style="margin-top:10px; display:none;" onclick="cancelEditWorkout()">Annulla Modifica</button>
+      </div>
+
+      <div id="workout-schemes-list"></div>
+    </section>
+
+    <!-- TAB 3: PROGRESSI -->
+    <section id="tab-progress" class="tab-content">
+      <div class="card">
+        <div class="card-title">Periodo di Analisi</div>
+        
+        <div class="period-picker-container">
+          <div class="period-group">
+            <label>Da Mese</label>
+            <div class="period-selects">
+              <select id="start-month" onchange="updateProgressChart()">
+                <option value="01">Gennaio</option>
+                <option value="02">Febbraio</option>
+                <option value="03">Marzo</option>
+                <option value="04">Aprile</option>
+                <option value="05">Maggio</option>
+                <option value="06">Giugno</option>
+                <option value="07">Luglio</option>
+                <option value="08">Agosto</option>
+                <option value="09" selected>Settembre</option>
+                <option value="10">Ottobre</option>
+                <option value="11">Novembre</option>
+                <option value="12">Dicembre</option>
+              </select>
+              <select id="start-year" onchange="updateProgressChart()">
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="period-group">
+            <label>A Mese</label>
+            <div class="period-selects">
+              <select id="end-month" onchange="updateProgressChart()">
+                <option value="01">Gennaio</option>
+                <option value="02">Febbraio</option>
+                <option value="03">Marzo</option>
+                <option value="04">Aprile</option>
+                <option value="05">Maggio</option>
+                <option value="06">Giugno</option>
+                <option value="07">Luglio</option>
+                <option value="08">Agosto</option>
+                <option value="09" selected>Settembre</option>
+                <option value="10">Ottobre</option>
+                <option value="11">Novembre</option>
+                <option value="12">Dicembre</option>
+              </select>
+              <select id="end-year" onchange="updateProgressChart()">
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <label>Filtra per Tipologia</label>
+        <select id="progress-workout-filter" onchange="updateProgressChart()">
+          <option value="ALL">TUTTI GLI ALLENAMENTI</option>
+        </select>
+
+        <label>Filtra per Esercizio (opzionale)</label>
+        <select id="progress-exercise-filter" onchange="updateProgressChart()" style="margin-bottom:0;">
+          <option value="ALL">VOLUME TOTALE (tutti gli esercizi)</option>
+        </select>
+      </div>
+
+      <div class="stats-container">
+        <div class="stat-card">
+          <label id="progress-stat-label">Variazione Carico Totale</label>
+          <div class="stat-val" id="progress-percentage">0%</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Andamento Carico nel Tempo</div>
+        <div style="position: relative; height: 230px; width: 100%;">
+          <canvas id="progressChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: CRONOMETRO & TIMER PAUSE -->
+    <section id="tab-timer" class="tab-content">
+      <div class="card">
+        <div class="card-title">Durata Sessione Allenamento</div>
+        <div class="timer-display" id="stopwatch-display">00:00:00</div>
+        <div class="timer-controls">
+          <button class="btn-primary" id="stopwatch-start-btn" onclick="toggleStopwatch()">Avvia</button>
+          <button class="btn-secondary" onclick="resetStopwatch()">Reset</button>
+        </div>
+      </div>
+
+      <div class="card" id="rest-timer-card">
+        <div class="card-title">Timer Pausa Esercizio</div>
+        
+        <label>Selezione Rapida</label>
+        <div class="quick-timer-grid">
+          <button class="quick-timer-btn" onclick="setRestTimer(30)">30s</button>
+          <button class="quick-timer-btn" onclick="setRestTimer(60)">60s</button>
+          <button class="quick-timer-btn" onclick="setRestTimer(90)">90s</button>
+          <button class="quick-timer-btn" onclick="setRestTimer(120)">2m</button>
+          <button class="quick-timer-btn" onclick="setRestTimer(180)">3m</button>
+        </div>
+
+        <div class="timer-display" id="rest-display" style="color: var(--accent-primary);">01:00</div>
+
+        <div class="timer-controls">
+          <button class="btn-primary" id="rest-start-btn" onclick="toggleRestTimer()">Avvia Pausa</button>
+          <button class="btn-secondary" onclick="resetRestTimer()">Reset</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav>
+    <button class="nav-btn active" data-tab="log" onclick="switchTab('log', this)">
+      <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+      LOG
+    </button>
+    <button class="nav-btn" data-tab="workouts" onclick="switchTab('workouts', this)">
+      <svg viewBox="0 0 24 24"><path d="M20.57 14.86L22 13.43 20.57 12l-1.43 1.43-1.43-1.43L16.29 13.43l1.43 1.43-1.43 1.43 1.43 1.43 1.43-1.43 1.43 1.43 1.43-1.43-1.43-1.43zM3 6h18v2H3zm0 5h10v2H3zm0 5h10v2H3z"/></svg>
+      SCHEDE
+    </button>
+    <button class="nav-btn" data-tab="progress" onclick="switchTab('progress', this)">
+      <svg viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+      PROGRESSI
+    </button>
+    <button class="nav-btn" data-tab="timer" onclick="switchTab('timer', this)">
+      <svg viewBox="0 0 24 24"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.962 8.962 0 0012 4c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+      TIMER
+    </button>
+  </nav>
+
+  <script>
+    // Registra il service worker: permette all'app di funzionare anche offline
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+
+    let currentDate = new Date();
+    const todayStr = formatDate(new Date());
+    let selectedDateStr = todayStr;
+
+    const tabsOrder = ['log', 'workouts', 'progress', 'timer'];
+    let currentTabIndex = 0;
+
+    function normalizeWorkouts(list) {
+      return list.map(w => ({
+        id: w.id,
+        name: w.name,
+        exercises: w.exercises.map(e => {
+          if (typeof e === 'string') return { name: e, sets: 3 };
+          return { name: e.name, sets: e.sets || 3 };
+        })
+      }));
+    }
+
+    function normalizeLogs(logsObj) {
+      const result = {};
+      Object.entries(logsObj).forEach(([date, log]) => {
+        result[date] = {
+          workoutId: log.workoutId,
+          data: log.data.map(item => {
+            if (Array.isArray(item.sets)) return item;
+            return { exercise: item.exercise, sets: [{ weight: item.weight || 0, reps: item.reps || 0 }] };
+          })
+        };
+      });
+      return result;
+    }
+
+    let workouts = normalizeWorkouts(JSON.parse(localStorage.getItem('gym_workouts')) || [
+      { id: '1', name: 'PUSH DAY', exercises: ['Panca Piana', 'Lento Avanti', 'Dip'] },
+      { id: '2', name: 'PULL DAY', exercises: ['Trazioni', 'Rematore', 'Curl Bilanciere'] },
+      { id: '3', name: 'LEG DAY', exercises: ['Squat', 'Affondi', 'Leg Curl'] }
+    ]);
+
+    let logs = normalizeLogs(JSON.parse(localStorage.getItem('gym_logs')) || {});
+
+    localStorage.setItem('gym_workouts', JSON.stringify(workouts));
+    localStorage.setItem('gym_logs', JSON.stringify(logs));
+
+    let chartInstance = null;
+
+    let stopwatchInterval = null;
+    let stopwatchTime = 0;
+    let isStopwatchRunning = false;
+
+    let restTimerInterval = null;
+    let restTimeSelected = 60;
+    let restTimeRemaining = 60;
+    let isRestTimerRunning = false;
+
+    window.onload = () => {
+      updateSelectedDateDisplay(selectedDateStr);
+      renderCalendar();
+      updateWorkoutDropdowns();
+      renderWorkoutSchemes();
+      populateExerciseFilter();
+      initChart();
+      initHighPrecisionSwipe();
+      requestWakeLock();
+    };
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && (currentTabIndex === 0 || currentTabIndex === 3)) {
+        requestWakeLock();
+      }
+    });
+
+    function formatDate(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatDisplayDate(dateStr) {
+      const parts = dateStr.split('-');
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function updateSelectedDateDisplay(dateStr) {
+      document.getElementById('selected-date-display').innerText = formatDisplayDate(dateStr);
+    }
+
+    function switchTab(tabId, btn) {
+      const newIndex = tabsOrder.indexOf(tabId);
+      if (newIndex === -1) return;
+
+      const direction = newIndex > currentTabIndex ? 'slide-left' : 'slide-right';
+      currentTabIndex = newIndex;
+
+      document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.remove('active', 'slide-left', 'slide-right');
+      });
+
+      const navBtns = document.querySelectorAll('.nav-btn');
+      navBtns.forEach(el => el.classList.remove('active'));
+
+      const targetTab = document.getElementById('tab-' + tabId);
+      targetTab.classList.add('active', direction);
+
+      if (btn) {
+        btn.classList.add('active');
+      } else {
+        const activeNavBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
+        if (activeNavBtn) activeNavBtn.classList.add('active');
+      }
+
+      const titles = { 
+        'log': 'Logbook Calendario', 
+        'workouts': 'Gestione Schede', 
+        'progress': 'Analisi Progressi',
+        'timer': 'Cronometro & Pause' 
+      };
+      document.getElementById('header-title').innerText = titles[tabId];
+
+      if (tabId === 'progress') updateProgressChart();
+
+      if (tabId === 'log' || tabId === 'timer') {
+        requestWakeLock();
+      } else {
+        releaseWakeLock();
+      }
+    }
+
+    let wakeLock = null;
+
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        wakeLock = null;
+      }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+      }
+    }
+
+    function initHighPrecisionSwipe() {
+      const container = document.getElementById('main-container');
+      let startX = 0, startY = 0;
+      let startTime = 0;
+      let isVerticalScroll = false;
+      let isHorizontalSwipe = false;
+
+      container.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        startTime = Date.now();
+        isVerticalScroll = false;
+        isHorizontalSwipe = false;
+      }, { passive: true });
+
+      container.addEventListener('touchmove', (e) => {
+        if (isVerticalScroll) return;
+
+        const touch = e.touches[0];
+        const diffX = touch.clientX - startX;
+        const diffY = touch.clientY - startY;
+
+        if (!isHorizontalSwipe && (Math.abs(diffX) > 8 || Math.abs(diffY) > 8)) {
+          if (Math.abs(diffY) > Math.abs(diffX) * 0.8) {
+            isVerticalScroll = true;
+          } else {
+            isHorizontalSwipe = true;
+          }
+        }
+      }, { passive: true });
+
+      container.addEventListener('touchend', (e) => {
+        if (isVerticalScroll || !isHorizontalSwipe) return;
+
+        const touch = e.changedTouches[0];
+        const diffX = touch.clientX - startX;
+        const diffY = touch.clientY - startY;
+        const duration = Date.now() - startTime;
+
+        const velocityX = Math.abs(diffX) / duration;
+        const isHorizontalDominant = Math.abs(diffX) > Math.abs(diffY) * 2.5;
+        const isEnoughDistance = Math.abs(diffX) > 60 || (velocityX > 0.35 && Math.abs(diffX) > 25);
+
+        if (isHorizontalDominant && isEnoughDistance) {
+          if (diffX < 0 && currentTabIndex < tabsOrder.length - 1) {
+            switchTab(tabsOrder[currentTabIndex + 1]);
+          } else if (diffX > 0 && currentTabIndex > 0) {
+            switchTab(tabsOrder[currentTabIndex - 1]);
+          }
+        }
+      }, { passive: true });
+    }
+
+    function formatTimeStopwatch(seconds) {
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function toggleStopwatch() {
+      const btn = document.getElementById('stopwatch-start-btn');
+      if (isStopwatchRunning) {
+        clearInterval(stopwatchInterval);
+        btn.innerText = "Riprendi";
+        isStopwatchRunning = false;
+      } else {
+        stopwatchInterval = setInterval(() => {
+          stopwatchTime++;
+          document.getElementById('stopwatch-display').innerText = formatTimeStopwatch(stopwatchTime);
+        }, 1000);
+        btn.innerText = "Pausa";
+        isStopwatchRunning = true;
+      }
+    }
+
+    function resetStopwatch() {
+      clearInterval(stopwatchInterval);
+      stopwatchTime = 0;
+      isStopwatchRunning = false;
+      document.getElementById('stopwatch-display').innerText = "00:00:00";
+      document.getElementById('stopwatch-start-btn').innerText = "Avvia";
+    }
+
+    function formatTimeRest(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function setRestTimer(sec) {
+      resetRestTimer();
+      restTimeSelected = sec;
+      restTimeRemaining = sec;
+      document.getElementById('rest-display').innerText = formatTimeRest(restTimeRemaining);
+    }
+
+    let audioCtx = null;
+
+    function unlockAudio() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {}
+    }
+
+    function playBeepTone(delay) {
+      if (!audioCtx) return;
+      setTimeout(() => {
+        try {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.35, audioCtx.currentTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.4);
+        } catch (e) {}
+      }, delay);
+    }
+
+    function playRestEndBeep() {
+      playBeepTone(0);
+      playBeepTone(280);
+    }
+
+    function toggleRestTimer() {
+      const btn = document.getElementById('rest-start-btn');
+      const card = document.getElementById('rest-timer-card');
+
+      unlockAudio();
+
+      if (isRestTimerRunning) {
+        clearInterval(restTimerInterval);
+        btn.innerText = "Riprendi";
+        isRestTimerRunning = false;
+      } else {
+        card.classList.remove('timer-alert');
+        if (restTimeRemaining <= 0) restTimeRemaining = restTimeSelected;
+
+        restTimerInterval = setInterval(() => {
+          restTimeRemaining--;
+          document.getElementById('rest-display').innerText = formatTimeRest(restTimeRemaining);
+
+          if (restTimeRemaining <= 0) {
+            clearInterval(restTimerInterval);
+            isRestTimerRunning = false;
+            btn.innerText = "Avvia Pausa";
+            card.classList.add('timer-alert');
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            playRestEndBeep();
+          }
+        }, 1000);
+
+        btn.innerText = "Pausa";
+        isRestTimerRunning = true;
+      }
+    }
+
+    function resetRestTimer() {
+      clearInterval(restTimerInterval);
+      isRestTimerRunning = false;
+      restTimeRemaining = restTimeSelected;
+      document.getElementById('rest-display').innerText = formatTimeRest(restTimeRemaining);
+      document.getElementById('rest-start-btn').innerText = "Avvia Pausa";
+      document.getElementById('rest-timer-card').classList.remove('timer-alert');
+    }
+
+    function renderCalendar() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      
+      document.getElementById('current-month-display').innerText = 
+        new Date(year, month).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }).toUpperCase();
+
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      
+      let startingIndex = firstDay.getDay() - 1;
+      if (startingIndex === -1) startingIndex = 6;
+
+      const grid = document.getElementById('calendar-body');
+      grid.innerHTML = '';
+
+      for (let i = 0; i < startingIndex; i++) {
+        grid.appendChild(document.createElement('div'));
+      }
+
+      for (let day = 1; day <= lastDay.getDate(); day++) {
+        const cellDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const cell = document.createElement('div');
+        cell.className = 'day-cell';
+        cell.innerText = day;
+
+        if (cellDate === todayStr) cell.classList.add('today');
+        if (cellDate === selectedDateStr) cell.classList.add('selected');
+
+        if (logs[cellDate]) {
+          const dot = document.createElement('div');
+          dot.className = 'dot';
+          dot.classList.add(cellDate > todayStr ? 'planned' : 'logged');
+          cell.appendChild(dot);
+        }
+
+        cell.onclick = () => {
+          selectedDateStr = cellDate;
+          updateSelectedDateDisplay(selectedDateStr);
+          renderCalendar();
+          loadSavedLogForDate();
+        };
+
+        grid.appendChild(cell);
+      }
+      loadSavedLogForDate();
+    }
+
+    function changeMonth(delta) {
+      currentDate.setMonth(currentDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    function updateWorkoutDropdowns() {
+      const selectLog = document.getElementById('workout-select');
+      const selectFilter = document.getElementById('progress-workout-filter');
+      
+      selectLog.innerHTML = '<option value="">-- Seleziona o Programma --</option>';
+      selectFilter.innerHTML = '<option value="ALL">TUTTI GLI ALLENAMENTI</option>';
+
+      workouts.forEach(w => {
+        selectLog.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+        selectFilter.innerHTML += `<option value="${w.id}">${w.name}</option>`;
+      });
+    }
+
+    let editingWorkoutId = null;
+    let currentExerciseNames = [];
+
+    function renderWorkoutSchemes() {
+      const container = document.getElementById('workout-schemes-list');
+      container.innerHTML = '';
+      workouts.forEach(w => {
+        container.innerHTML += `
+          <div class="card">
+            <div class="card-title">
+              <span style="color:var(--accent-primary);">${w.name}</span>
+              <div style="display:flex; gap:8px;">
+                <button class="btn-secondary" style="width:auto; padding:6px 12px; margin:0;" onclick="editWorkoutScheme('${w.id}')">Modifica</button>
+                <button class="btn-danger" style="width:auto; padding:6px 12px; margin:0;" onclick="deleteWorkoutScheme('${w.id}')">Elimina</button>
+              </div>
+            </div>
+            <p style="color:var(--text-secondary); font-size:0.85rem; font-weight:500;">${w.exercises.map(e => `${e.name} (${e.sets} serie)`).join(' • ')}</p>
+          </div>
+        `;
+      });
+    }
+
+    function renderExerciseSetsConfig(existingExercises) {
+      const exStr = document.getElementById('new-workout-exercises').value.trim();
+      currentExerciseNames = exStr.split(',').map(e => e.trim()).filter(e => e.length > 0);
+      const container = document.getElementById('exercise-sets-config');
+      container.innerHTML = '';
+
+      currentExerciseNames.forEach((exName, idx) => {
+        let defaultSets = 3;
+        if (existingExercises) {
+          const found = existingExercises.find(e => e.name === exName);
+          if (found) defaultSets = found.sets;
+        }
+        container.innerHTML += `
+          <div class="sets-config-row">
+            <label>${exName}</label>
+            <input type="number" min="1" max="12" value="${defaultSets}" id="sets-config-${idx}">
+          </div>
+        `;
+      });
+    }
+
+    function editWorkoutScheme(id) {
+      const w = workouts.find(w => w.id === id);
+      if (!w) return;
+
+      editingWorkoutId = id;
+      document.getElementById('new-workout-name').value = w.name;
+      document.getElementById('new-workout-exercises').value = w.exercises.map(e => e.name).join(', ');
+      renderExerciseSetsConfig(w.exercises);
+      document.getElementById('workout-form-title').innerText = 'Modifica Scheda';
+      document.getElementById('save-workout-btn').innerText = 'Salva Modifiche';
+      document.getElementById('cancel-edit-btn').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEditWorkout() {
+      editingWorkoutId = null;
+      document.getElementById('new-workout-name').value = '';
+      document.getElementById('new-workout-exercises').value = '';
+      document.getElementById('exercise-sets-config').innerHTML = '';
+      currentExerciseNames = [];
+      document.getElementById('workout-form-title').innerText = 'Crea Nuova Scheda';
+      document.getElementById('save-workout-btn').innerText = 'Salva Scheda in Lista';
+      document.getElementById('cancel-edit-btn').style.display = 'none';
+    }
+
+    function addWorkoutScheme() {
+      const name = document.getElementById('new-workout-name').value.trim();
+      if (!name) return alert("Inserisci un nome per la scheda!");
+      if (currentExerciseNames.length === 0) return alert("Inserisci almeno un esercizio!");
+
+      const exercises = currentExerciseNames.map((exName, idx) => {
+        const setsInput = document.getElementById(`sets-config-${idx}`);
+        const sets = setsInput ? (parseInt(setsInput.value) || 1) : 3;
+        return { name: exName, sets };
+      });
+
+      if (editingWorkoutId) {
+        const w = workouts.find(w => w.id === editingWorkoutId);
+        if (w) {
+          w.name = name;
+          w.exercises = exercises;
+        }
+        cancelEditWorkout();
+      } else {
+        workouts.push({ id: Date.now().toString(), name, exercises });
+        cancelEditWorkout();
+      }
+
+      localStorage.setItem('gym_workouts', JSON.stringify(workouts));
+      updateWorkoutDropdowns();
+      renderWorkoutSchemes();
+      populateExerciseFilter();
+    }
+
+    function deleteWorkoutScheme(id) {
+      if (editingWorkoutId === id) cancelEditWorkout();
+      workouts = workouts.filter(w => w.id !== id);
+      localStorage.setItem('gym_workouts', JSON.stringify(workouts));
+      updateWorkoutDropdowns();
+      renderWorkoutSchemes();
+      populateExerciseFilter();
+    }
+
+    function renderExerciseLogForm(workoutId, existingLog) {
+      const container = document.getElementById('exercise-logs-container');
+      container.innerHTML = '';
+
+      const workout = workouts.find(w => w.id === workoutId);
+      if (!workout) return;
+
+      workout.exercises.forEach((ex, exIdx) => {
+        const existingItem = existingLog ? existingLog.data.find(d => d.exercise === ex.name) : null;
+        let setsHtml = '';
+
+        for (let s = 0; s < ex.sets; s++) {
+          const existingSet = existingItem && existingItem.sets[s] ? existingItem.sets[s] : null;
+          const wVal = existingSet && existingSet.weight ? existingSet.weight : '';
+          const rVal = existingSet && existingSet.reps ? existingSet.reps : '';
+          setsHtml += `
+            <div class="set-line">
+              <div class="set-number">${s + 1}</div>
+              <input type="number" value="${wVal}" placeholder="Kg" id="weight-${exIdx}-${s}">
+              <input type="number" value="${rVal}" placeholder="Reps" id="reps-${exIdx}-${s}">
+            </div>
+          `;
+        }
+
+        container.innerHTML += `
+          <div class="exercise-block">
+            <label style="color:var(--text-primary); margin-bottom:4px;">${ex.name}</label>
+            ${setsHtml}
+          </div>
+        `;
+      });
+    }
+
+    function loadWorkoutTemplate() {
+      const wId = document.getElementById('workout-select').value;
+      const container = document.getElementById('exercise-logs-container');
+
+      if (!wId) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const existingLog = (logs[selectedDateStr] && logs[selectedDateStr].workoutId === wId) ? logs[selectedDateStr] : null;
+      renderExerciseLogForm(wId, existingLog);
+    }
+
+    function getMaxWeightForExercise(exerciseName, excludeDate) {
+      let max = 0;
+      Object.entries(logs).forEach(([date, log]) => {
+        if (date === excludeDate) return;
+        log.data.forEach(item => {
+          if (item.exercise !== exerciseName) return;
+          item.sets.forEach(s => { if (s.weight > max) max = s.weight; });
+        });
+      });
+      return max;
+    }
+
+    function saveDailyLog() {
+      const wId = document.getElementById('workout-select').value;
+      if (!wId) return alert("Seleziona una scheda prima di salvare!");
+
+      const workout = workouts.find(w => w.id === wId);
+      const exData = [];
+      const newPRs = [];
+
+      workout.exercises.forEach((ex, exIdx) => {
+        const sets = [];
+        let maxWeightThisExercise = 0;
+
+        for (let s = 0; s < ex.sets; s++) {
+          const kg = parseFloat(document.getElementById(`weight-${exIdx}-${s}`).value) || 0;
+          const reps = parseInt(document.getElementById(`reps-${exIdx}-${s}`).value) || 0;
+          sets.push({ weight: kg, reps: reps });
+          if (kg > maxWeightThisExercise) maxWeightThisExercise = kg;
+        }
+
+        exData.push({ exercise: ex.name, sets });
+
+        if (maxWeightThisExercise > 0) {
+          const prevMax = getMaxWeightForExercise(ex.name, selectedDateStr);
+          if (maxWeightThisExercise > prevMax) newPRs.push(`${ex.name}: ${maxWeightThisExercise}kg`);
+        }
+      });
+
+      logs[selectedDateStr] = { workoutId: wId, data: exData };
+      localStorage.setItem('gym_logs', JSON.stringify(logs));
+      
+      renderCalendar();
+      populateExerciseFilter();
+
+      if (newPRs.length > 0 && selectedDateStr <= todayStr) {
+        alert("🏆 Nuovo Record Personale!\n" + newPRs.join('\n'));
+      } else {
+        alert(selectedDateStr > todayStr ? "Allenamento programmato con successo!" : "Allenamento registrato!");
+      }
+    }
+
+    function deleteDailyLog() {
+      if (!logs[selectedDateStr]) {
+        alert("Nessun allenamento salvato per questa data.");
+        return;
+      }
+
+      if (confirm(`Sei sicuro di voler eliminare la sessione del ${formatDisplayDate(selectedDateStr)}?`)) {
+        delete logs[selectedDateStr];
+        localStorage.setItem('gym_logs', JSON.stringify(logs));
+        renderCalendar();
+        loadSavedLogForDate();
+        alert("Sessione eliminata con successo!");
+      }
+    }
+
+    function loadSavedLogForDate() {
+      const log = logs[selectedDateStr];
+      const select = document.getElementById('workout-select');
+
+      if (log) {
+        select.value = log.workoutId;
+        renderExerciseLogForm(log.workoutId, log);
+      } else {
+        select.value = '';
+        document.getElementById('exercise-logs-container').innerHTML = '';
+      }
+    }
+
+    function initChart() {
+      const ctx = document.getElementById('progressChart').getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+      gradient.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+      gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { 
+          labels: [], 
+          datasets: [{ 
+            label: 'Volume Totale (Kg x Reps)', 
+            data: [], 
+            borderColor: '#38bdf8', 
+            borderWidth: 3,
+            backgroundColor: gradient, 
+            fill: true, 
+            tension: 0.35,
+            pointBackgroundColor: '#38bdf8',
+            pointRadius: 4
+          }] 
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#94a3b8', font: { size: 10, weight: '600' } }, grid: { display: false } },
+            y: { ticks: { color: '#94a3b8', font: { size: 10, weight: '600' } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function populateExerciseFilter() {
+      const select = document.getElementById('progress-exercise-filter');
+      const current = select.value;
+      const names = new Set();
+
+      workouts.forEach(w => w.exercises.forEach(e => names.add(e.name)));
+      Object.values(logs).forEach(log => log.data.forEach(d => names.add(d.exercise)));
+
+      select.innerHTML = '<option value="ALL">VOLUME TOTALE (tutti gli esercizi)</option>';
+      Array.from(names).sort((a, b) => a.localeCompare(b)).forEach(name => {
+        select.innerHTML += `<option value="${name}">${name}</option>`;
+      });
+
+      if (names.has(current)) select.value = current;
+    }
+
+    function updateProgressChart() {
+      const filterId = document.getElementById('progress-workout-filter').value;
+      const exerciseFilter = document.getElementById('progress-exercise-filter').value;
+      
+      const startM = document.getElementById('start-month').value;
+      const startY = document.getElementById('start-year').value;
+      const startMonth = `${startY}-${startM}`;
+
+      const endM = document.getElementById('end-month').value;
+      const endY = document.getElementById('end-year').value;
+      const endMonth = `${endY}-${endM}`;
+
+      const dates = Object.keys(logs).sort();
+      const filteredDates = dates.filter(d => {
+        const month = d.substring(0, 7);
+        const matchWorkout = (filterId === 'ALL' || logs[d].workoutId === filterId);
+        const matchDate = (!startMonth || month >= startMonth) && (!endMonth || month <= endMonth);
+        const matchExercise = (exerciseFilter === 'ALL' || logs[d].data.some(ex => ex.exercise === exerciseFilter));
+        return matchWorkout && matchDate && matchExercise;
+      });
+
+      let values, datasetLabel, statLabel;
+
+      if (exerciseFilter !== 'ALL') {
+        values = filteredDates.map(d => {
+          const entries = logs[d].data.filter(ex => ex.exercise === exerciseFilter);
+          let maxW = 0;
+          entries.forEach(item => item.sets.forEach(s => { if (s.weight > maxW) maxW = s.weight; }));
+          return maxW;
+        });
+        datasetLabel = `Peso Max - ${exerciseFilter} (Kg)`;
+        statLabel = `Variazione Peso Max - ${exerciseFilter}`;
+      } else {
+        values = filteredDates.map(d => {
+          let totalVolume = 0;
+          logs[d].data.forEach(item => {
+            item.sets.forEach(s => { totalVolume += (s.weight * s.reps); });
+          });
+          return totalVolume;
+        });
+        datasetLabel = 'Volume Totale (Kg x Reps)';
+        statLabel = 'Variazione Carico Totale';
+      }
+
+      chartInstance.data.labels = filteredDates;
+      chartInstance.data.datasets[0].data = values;
+      chartInstance.data.datasets[0].label = datasetLabel;
+      chartInstance.update();
+
+      document.getElementById('progress-stat-label').innerText = statLabel;
+
+      const percentEl = document.getElementById('progress-percentage');
+      if (values.length >= 2) {
+        const initial = values[0];
+        const final = values[values.length - 1];
+        const diff = initial > 0 ? (((final - initial) / initial) * 100).toFixed(1) : 0;
+        percentEl.innerText = (diff >= 0 ? '+' : '') + diff + '%';
+        percentEl.style.color = diff >= 0 ? '#4ade80' : '#ef4444';
+      } else {
+        percentEl.innerText = '0%';
+        percentEl.style.color = 'var(--accent-primary)';
+      }
+    }
+
+    function exportBackup() {
+      const backup = {
+        exportedAt: new Date().toISOString(),
+        workouts: workouts,
+        logs: logs
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gym-log-backup-${formatDate(new Date())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function importBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.workouts || !data.logs) throw new Error('Formato non valido');
+
+          if (!confirm("Importare questo backup sovrascriverà tutti i dati attuali (schede e sessioni). Continuare?")) return;
+
+          workouts = data.workouts;
+          logs = data.logs;
+          localStorage.setItem('gym_workouts', JSON.stringify(workouts));
+          localStorage.setItem('gym_logs', JSON.stringify(logs));
+
+          cancelEditWorkout();
+          updateWorkoutDropdowns();
+          renderWorkoutSchemes();
+          renderCalendar();
+          loadSavedLogForDate();
+          populateExerciseFilter();
+
+          alert("Backup importato con successo!");
+        } catch (err) {
+          alert("File non valido: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+  </script>
+</body>
+</html>
